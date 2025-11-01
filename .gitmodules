@@ -1,0 +1,3 @@
+[submodule "QuantFi_contract/QuantFi_contract/lib/forge-std"]
+	path = QuantFi_contract/QuantFi_contract/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
