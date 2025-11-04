@@ -1,51 +1,59 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-
 interface IDefiAdapter {
     // 返回操作类型是否支持
-    function supportOperation(uint256 operationType) external virtual view returns (bool);
+    function supportOperation(
+        OperationType operationType
+    ) external view virtual returns (bool);
     // 获取支持的操作类型
-    function getSupportedOperations() external virtual view returns (uint256[] memory);
+    function getSupportedOperations()
+        external
+        view
+        virtual
+        returns (uint256[] memory);
     // 执行操作
-    function executeOperation(OperationParams params) external virtual returns (OperationResult);
+    function executeOperation(
+        OperationParams calldata params,
+        uint24 feeRate
+    ) external virtual returns (OperationResult memory);
     // 获取适配器名称
     function getName() external view virtual returns (string memory);
     // 获取适配器版本
     function getVersion() external view virtual returns (string memory);
-
 }
 
 struct OperationParams {
-    uint256 operationType;
+    OperationType operationType;
     bytes data;
-    uint256[] tokens;
+    address[] tokens;
     uint256[] amounts;
     address recipient;
     uint256 deadline;
-     // NFT tokenId (用于 UniswapV3, Aave 等基于 NFT 的协议)
-    uint256 tokenId;      
-     // 额外的操作特定数据
-    bytes extraData;       
+    // NFT tokenId (用于 UniswapV3, Aave 等基于 NFT 的协议)
+    uint256 tokenId;
+    // 额外的操作特定数据
+    bytes extraData;
 }
 
 struct OperationResult {
     uint256[] outputAmounts;
     bytes data;
     bool success;
+    string message;
 }
 
 enum OperationType {
     //deposit
-    DEPOSIT = 1,
+    DEPOSIT,
     //withdraw
-    WITHDRAW = 2,
+    WITHDRAW,
     //添加流动性
-    ADD_LIQUIDITY = 3,
+    ADD_LIQUIDITY,
     //移除流动性
-    REMOVE_LIQUIDITY = 4,
+    REMOVE_LIQUIDITY,
     //提取手续费
-    COLLECT_FEES = 5,
+    COLLECT_FEES,
     // 交换代币
-    SWAP = 6
+    SWAP
 }

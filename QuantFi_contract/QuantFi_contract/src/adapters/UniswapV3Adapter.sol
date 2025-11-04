@@ -1,31 +1,29 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
+
 import "../interfaces/IDefiAdapter.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import "openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/INonfungiblePositionManager.sol";
 
 contract UniswapV3Adapter is
     IDefiAdapter,
     Initializable,
-    OwnableUpgradeable,
+    Ownable,
     UUPSUpgradeable
 {
     address public inonfungiblePositionManager;
     using SafeERC20 for IERC20;
 
-    constructor() {
+    constructor(address owner) Ownable(owner) {
         _disableInitializers();
     }
 
     //  初始化函数
     function initialize(address positonManager) public initializer {
-        __Ownable_init();
-        __UUPSUpgradeable_init();
-
         inonfungiblePositionManager = positonManager;
     }
     // 实现UUPSUpgradeable升级逻辑
@@ -55,8 +53,6 @@ contract UniswapV3Adapter is
         address indexed token0,
         address indexed token1,
         uint24 indexed fee,
-        int24 tickLower,
-        int24 tickUpper,
         uint128 liquidity,
         uint256 amount0,
         uint256 amount1,
@@ -66,13 +62,11 @@ contract UniswapV3Adapter is
         uint256 deadline,
         uint256 amount0Actual,
         uint256 amount1Actual
-    )
+    );
     event CollectFees(
         address indexed token0,
         address indexed token1,
         uint24 indexed fee,
-        int24 tickLower,
-        int24 tickUpper,
         uint128 amount0,
         uint128 amount1,
         uint256 amount0Min,
@@ -109,11 +103,12 @@ contract UniswapV3Adapter is
 
     // 执行操作
     function executeOperation(
-        OperationParams params
-    ) external override returns (OperationResult result) {
+        OperationParams calldata params,
+        uint24 feeBaseRate
+    ) external override returns (OperationResult memory result) {
         if (params.operationType == OperationType.ADD_LIQUIDITY) {
             // 添加流动性逻辑
-            result = _addLiquidity(params);
+            result = _addLiquidity(params, feeBaseRate);
         } else if (params.operationType == OperationType.REMOVE_LIQUIDITY) {
             // 移除流动性逻辑
             result = _removeLiquidity(params);
@@ -137,14 +132,16 @@ contract UniswapV3Adapter is
 
     //添加流动性
     function _addLiquidity(
-        OperationParams memory params,
-        uint256 feeBase
-    ) internal returns (OperationResult) {
+        OperationParams calldata params,
+        uint24 feeBaseRate
+    ) internal returns (OperationResult memory result) {
         require(params.tokens.length == 2, "Invalid token length");
         //索引0和1是代币数量 2和3是最小代币数量
         require(params.amounts.length == 4, "Invalid amount length");
-        require(params.recipient != address(0), "Recipient address must be specified");
-
+        require(
+            params.recipient != address(0),
+            "Recipient address must be specified"
+        );
 
         //查看用户是否有代币
         for (uint256 i = 0; i < params.tokens.length; i++) {
@@ -167,18 +164,24 @@ contract UniswapV3Adapter is
 
         //计算手续费
         uint256 amount0DecreaseFee = params.amounts[0] -
-            (params.amounts[0] * feeBase) /
+            (params.amounts[0] * 30) /
             10000;
         uint256 amount1DecreaseFee = params.amounts[1] -
-            (params.amounts[1] * feeBase) /
+            (params.amounts[1] * 30) /
             10000;
         //授权给NonfungiblePositionManager
-        IERC20(params.tokens[0]).approve(inonfungiblePositionManager, amount0DecreaseFee);
-        IERC20(params.tokens[1]).approve(inonfungiblePositionManager, amount1DecreaseFee);
+        IERC20(params.tokens[0]).approve(
+            inonfungiblePositionManager,
+            amount0DecreaseFee
+        );
+        IERC20(params.tokens[1]).approve(
+            inonfungiblePositionManager,
+            amount1DecreaseFee
+        );
 
         //tick范围(需要设置提供流动性的tick范围 uniswap V3特性)
-        uint256 tickLower = -887220;
-        uint256 tickUpper = 887220;
+        int24 tickLower = -887220;
+        int24 tickUpper = 887220;
 
         // 从 extraData 中解析 tick 参数
         if (params.extraData.length > 0) {
@@ -195,39 +198,40 @@ contract UniswapV3Adapter is
         }
         //创建mintParams参数
         INonfungiblePositionManager.MintParams
-            memory mintParams = INonfungiblePositionManager(
-                inonfungiblePositionManager
-            ).MintParams({
+            memory mintParams = INonfungiblePositionManager.MintParams({
                 token0: params.tokens[0],
                 token1: params.tokens[1],
-                fee: feeBase,
+                fee: feeBaseRate,
                 tickLower: tickLower,
                 tickUpper: tickUpper,
-                amount0: amount0DecreaseFee,
-                amount1: amount1DecreaseFee,
+                amount0Desired: amount0DecreaseFee,
+                amount1Desired: amount1DecreaseFee,
                 amount0Min: params.amounts[2],
                 amount1Min: params.amounts[3],
                 recipient: params.recipient,
                 deadline: params.deadline
-
             });
-                
+
         (
             uint256 tokenId,
             uint128 liquidity,
             uint256 amount0Actual,
             uint256 amount1Actual
-        ) = inonfungiblePositionManager.mint(mintParams);
+        ) = INonfungiblePositionManager(inonfungiblePositionManager).mint(
+                mintParams
+            );
 
         //发送添加流动性的事件
         emit AddLiquidity(
             params.tokens[0],
             params.tokens[1],
-            feeBase,
+            feeBaseRate,
             tickLower,
             tickUpper,
-            amount0,
-            amount1,
+            amount0DecreaseFee,
+            amount1DecreaseFee,
+            params.amounts[2],
+            params.amounts[3],
             params.recipient,
             params.deadline,
             tokenId,
@@ -236,10 +240,9 @@ contract UniswapV3Adapter is
             amount1Actual
         );
 
-        OperationResult result = new OperationResult();
-        result.amounts = new uint256[](1);
+        result.outputAmounts = new uint256[](1);
         //返回添加的tokenId（ERC721代币）
-        result.amounts[0] = tokenId;
+        result.outputAmounts[0] = tokenId;
         result.success = true;
         result.message = "Add liquidity successful";
         return result;
@@ -247,60 +250,68 @@ contract UniswapV3Adapter is
 
     //移除流动性
     function _removeLiquidity(
-        OperationParams memory params,
-        uint256 feeBase
-    ) internal returns (OperationResult) {
+        OperationParams calldata params
+    ) internal returns (OperationResult memory result) {
         require(params.tokenId > 0, "Invalid tokenId");
         require(params.amounts.length == 2, "Invalid amount length");
         //验证tokenId是否属于用户
         require(
-            inonfungiblePositionManager.ownerOf(params.tokenId) == params.recipient,
+            INonfungiblePositionManager(inonfungiblePositionManager).ownerOf(
+                params.tokenId
+            ) == params.recipient,
             "Not owner"
         );
         //获取用户头寸
-        (,,,,liquidity,,) = inonfungiblePositionManager.positions(params.tokenId);
+        (, , , , , , , uint256 liquidity, , , , ) = INonfungiblePositionManager(
+            inonfungiblePositionManager
+        ).positions(params.tokenId);
         require(liquidity > 0, "Invalid liquidity");
         //创建removeLiquidity参数
         INonfungiblePositionManager.DecreaseLiquidityParams
-            memory decreaseLiquidityParams = INonfungiblePositionManager(
-                inonfungiblePositionManager
-            ).DecreaseLiquidityParams({
-                tokenId: params.tokenId,
-                liquidity: liquidity,
-                amount0Min: params.amounts[0],
-                amount1Min: params.amounts[1],
-                deadline: params.deadline
-            });
+            memory decreaseLiquidityParams = INonfungiblePositionManager
+                .DecreaseLiquidityParams({
+                    tokenId: params.tokenId,
+                    liquidity: uint128(liquidity),
+                    amount0Min: params.amounts[0],
+                    amount1Min: params.amounts[1],
+                    deadline: params.deadline
+                });
         //减少流动性
-        (uint256 amount0, uint256 amount1) = inonfungiblePositionManager.decreaseLiquidity(
-            decreaseLiquidityParams
-        );
+        (uint256 amount0, uint256 amount1) = INonfungiblePositionManager(
+            inonfungiblePositionManager
+        ).decreaseLiquidity(decreaseLiquidityParams);
 
         //创建collectParams参数
         INonfungiblePositionManager.CollectParams
-            memory collectParams = INonfungiblePositionManager(
-                inonfungiblePositionManager
-            ).CollectParams({
+            memory collectParams = INonfungiblePositionManager.CollectParams({
                 tokenId: params.tokenId,
                 recipient: params.recipient,
                 amount0Max: type(uint128).max,
                 amount1Max: type(uint128).max
             });
         //收集手续费代币
-        (amount0, amount1) = inonfungiblePositionManager.collect(collectParams);
+        (amount0, amount1) = INonfungiblePositionManager(
+            inonfungiblePositionManager
+        ).collect(collectParams);
 
         emit RemoveLiquidity(
-            params.tokenId,
+            params.tokens[0],
+            params.tokens[1],
+            uint24(3000),
+            uint128(liquidity),
+            amount0,
+            amount1,
+            params.amounts[0],
+            params.amounts[1],
             params.recipient,
             params.deadline,
             amount0,
             amount1
         );
         //返回移除流动性释放的代币数量
-        OperationResult result = new OperationResult();
-        result.amounts = new uint256[](2);
-        result.amounts[0] = amount0;
-        result.amounts[1] = amount1;
+        result.outputAmounts = new uint256[](2);
+        result.outputAmounts[0] = amount0;
+        result.outputAmounts[1] = amount1;
         result.success = true;
         result.message = "Remove liquidity successful";
         return result;
@@ -308,42 +319,48 @@ contract UniswapV3Adapter is
 
     //提取手续费
     function _collectFees(
-        OperationParams memory params,
-        uint256 feeBase
-    ) internal returns (OperationResult) {
+        OperationParams calldata params
+    ) internal returns (OperationResult memory result) {
         require(params.tokenId > 0, "Invalid tokenId");
         require(params.amounts.length == 2, "Invalid amount length");
         //验证tokenId是否属于用户
         require(
-            inonfungiblePositionManager.ownerOf(params.tokenId) == params.recipient,
+            INonfungiblePositionManager(inonfungiblePositionManager).ownerOf(
+                params.tokenId
+            ) == params.recipient,
             "Not owner"
         );
         //创建collectParams参数
         INonfungiblePositionManager.CollectParams
-            memory collectParams = INonfungiblePositionManager(
-                inonfungiblePositionManager
-            ).CollectParams({
+            memory collectParams = INonfungiblePositionManager.CollectParams({
                 tokenId: params.tokenId,
                 recipient: params.recipient,
                 amount0Max: type(uint128).max,
                 amount1Max: type(uint128).max
             });
-        (uint256 amount0, uint256 amount1) = inonfungiblePositionManager.collect(collectParams);
+        (uint256 amount0, uint256 amount1) = INonfungiblePositionManager(
+            inonfungiblePositionManager
+        ).collect(collectParams);
         emit CollectFees(
-            params.tokenId,
+            params.tokens[0],
+            params.tokens[1],
+            uint24(3000),
+            uint128(amount0),
+            uint128(amount1),
+            0,
+            0,
             params.recipient,
+            params.deadline,
             amount0,
             amount1
         );
-        OperationResult result = new OperationResult();
-        result.amounts = new uint256[](2);
-        result.amounts[0] = amount0;
-        result.amounts[1] = amount1;
+        result.outputAmounts = new uint256[](2);
+        result.outputAmounts[0] = amount0;
+        result.outputAmounts[1] = amount1;
         result.success = true;
         result.message = "Collect fees successful";
 
         return result;
-
     }
 
     function decodeTicks(
