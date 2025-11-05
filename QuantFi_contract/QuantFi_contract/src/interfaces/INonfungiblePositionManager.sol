@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 
 /**
  * @title INonfungiblePositionManager
@@ -54,7 +54,9 @@ interface INonfungiblePositionManager is IERC721 {
      * @return amount0 实际使用的 token0 数量
      * @return amount1 实际使用的 token1 数量
      */
-    function mint(MintParams calldata params)
+    function mint(
+        MintParams calldata params
+    )
         external
         payable
         returns (
@@ -71,14 +73,12 @@ interface INonfungiblePositionManager is IERC721 {
      * @return amount0 实际使用的 token0 数量
      * @return amount1 实际使用的 token1 数量
      */
-    function increaseLiquidity(IncreaseLiquidityParams calldata params)
+    function increaseLiquidity(
+        IncreaseLiquidityParams calldata params
+    )
         external
         payable
-        returns (
-            uint128 liquidity,
-            uint256 amount0,
-            uint256 amount1
-        );
+        returns (uint128 liquidity, uint256 amount0, uint256 amount1);
 
     /**
      * @notice 减少现有位置的流动性
@@ -86,10 +86,9 @@ interface INonfungiblePositionManager is IERC721 {
      * @return amount0 减少的 token0 数量
      * @return amount1 减少的 token1 数量
      */
-    function decreaseLiquidity(DecreaseLiquidityParams calldata params)
-        external
-        payable
-        returns (uint256 amount0, uint256 amount1);
+    function decreaseLiquidity(
+        DecreaseLiquidityParams calldata params
+    ) external payable returns (uint256 amount0, uint256 amount1);
 
     /**
      * @notice 收集位置的手续费和代币
@@ -97,10 +96,9 @@ interface INonfungiblePositionManager is IERC721 {
      * @return amount0 收集的 token0 数量
      * @return amount1 收集的 token1 数量
      */
-    function collect(CollectParams calldata params)
-        external
-        payable
-        returns (uint256 amount0, uint256 amount1);
+    function collect(
+        CollectParams calldata params
+    ) external payable returns (uint256 amount0, uint256 amount1);
 
     /**
      * @notice 销毁 NFT（必须先移除所有流动性）
@@ -124,7 +122,9 @@ interface INonfungiblePositionManager is IERC721 {
      * @return tokensOwed0 欠付的 token0
      * @return tokensOwed1 欠付的 token1
      */
-    function positions(uint256 tokenId)
+    function positions(
+        uint256 tokenId
+    )
         external
         view
         returns (

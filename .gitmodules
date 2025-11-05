@@ -4,3 +4,6 @@
 [submodule "QuantFi_contract/QuantFi_contract/lib/openzeppelin-contracts"]
 	path = QuantFi_contract/QuantFi_contract/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "QuantFi_contract/QuantFi_contract/lib/openzeppelin-contracts-upgradeable"]
+	path = QuantFi_contract/QuantFi_contract/lib/openzeppelin-contracts-upgradeable
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable

@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "../interfaces/IDefiAdapter.sol";
 import "openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import "openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -12,18 +12,22 @@ import "../interfaces/INonfungiblePositionManager.sol";
 contract UniswapV3Adapter is
     IDefiAdapter,
     Initializable,
-    Ownable,
+    OwnableUpgradeable,
     UUPSUpgradeable
 {
     address public inonfungiblePositionManager;
     using SafeERC20 for IERC20;
 
-    constructor(address owner) Ownable(owner) {
+    constructor() {
         _disableInitializers();
     }
 
     //  初始化函数
-    function initialize(address positonManager) public initializer {
+    function initialize(
+        address positonManager,
+        address _owner
+    ) public initializer {
+        __Ownable_init(_owner);
         inonfungiblePositionManager = positonManager;
     }
     // 实现UUPSUpgradeable升级逻辑
