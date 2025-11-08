@@ -1,0 +1,280 @@
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import "../../IDexRouter.sol";
+import "../../lib/Model.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+/**
+ * @title UniswapV3Router
+ * @dev 实现IDexRouter接口的Uniswap V3路由器合约
+ */
+contract UniswapV3Router is IDexRouter, Ownable, ReentrancyGuard {
+    // Uniswap V3路由器地址
+    ISwapRouter public immutable swapRouter;
+
+    // Uniswap V3 Quoter地址
+    IQuoter public immutable quoter;
+
+    // Uniswap V3工厂地址
+    IUniswapV3Factory public immutable factory;
+
+    // 支持交换的tokens
+    address[] public exchangeableTokens;
+
+    // 支持的费用层级 (代币对 => 对应的池信息)
+    mapping(address token0 => mapping(address token1 => uint24 fee)) public feeTiers;
+
+ 
+    // 事件
+    event SwapTokensForTokens(uint256 amountIn, uint256 amountOut, address to);
+    event SetFeeTier(address tokenA, address tokenB, uint24 fee);
+
+    constructor(
+        address _swapRouter,
+        address _quoter,
+        address _factory,
+        address _owner,
+        address[] memory _exchangeableTokens,
+        uint24[] memory _feeTiers
+    ) Ownable(_owner) {
+        require(_exchangeableTokens.length > 1, "UniswapV3Router: INVALID_TOKENS_LENGTH");
+        require(_exchangeableTokens.length - 1 == _feeTiers.length, "UniswapV3Router: INVALID_FEE_TIERS_LENGTH");
+        require(_swapRouter != address(0), "UniswapV3Router: INVALID_ROUTER");
+        require(_quoter != address(0), "UniswapV3Router: INVALID_QUOTER");
+        require(_factory != address(0), "UniswapV3Router: INVALID_FACTORY");
+        require(_owner != address(0), "UniswapV3Router: INVALID_OWNER");
+        quoter = IQuoter(_quoter);
+        swapRouter = ISwapRouter(_swapRouter);
+        factory = IUniswapV3Factory(_factory);
+        exchangeableTokens = _exchangeableTokens;
+        setFeeTiers(_feeTiers); // 初始化费用层级
+    }
+
+    function setFeeTiers(uint24[] memory _feeTiers) public onlyOwner {
+        // 初始化费用层级映射
+        for (uint256 i = 0; i < exchangeableTokens.length; i++) {
+            if (i == 0) { continue; }
+            address tokenA = exchangeableTokens[i];
+            address tokenB = exchangeableTokens[i-1];
+            uint24 fee = _feeTiers[i % _feeTiers.length];  
+            setFeeTier(tokenA, tokenB, fee);
+        }
+    }
+
+    function setFeeTier(address tokenA, address tokenB, uint24 fee) public onlyOwner {
+        address poolAddress = factory.getPool(tokenA, tokenB, fee);
+        require(poolAddress != address(0), "UniswapV3Router: POOL_NOT_EXIST");
+        if (poolAddress != address(0)) {
+            feeTiers[tokenA][tokenB] = fee;
+            feeTiers[tokenB][tokenA] = fee;
+            emit SetFeeTier(tokenA, tokenB, fee);
+        }
+    }
+
+    /**
+     * @dev 实现IDexRouter.swapTokensForTokens
+     * 根据给定路径将精确数量的输入代币交换为输出代币
+     */
+    function swapTokensForTokens(
+        Model.SwapPath memory swapPath,
+        address tokenIn,
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address to,
+        uint256 deadline
+    ) external override nonReentrant returns (uint256) {
+        require(deadline >= block.timestamp, "UniswapV3Router: EXPIRED");
+        require(swapPath.path.length >= 2, "UniswapV3Router: INVALID_PATH");
+
+        // 将代币转入本合约
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+
+        // 批准路由器使用代币
+        IERC20(tokenIn).approve(address(swapRouter), amountIn);
+
+        // 准备交换参数
+        // Model.SwapPath memory swapPath = getAmountsOut(tokenIn, amountIn, tokenOut, maxHops);
+
+        ISwapRouter.ExactInputParams memory params =
+            ISwapRouter.ExactInputParams({
+                path: swapPath.pathBytes,
+                recipient: to,
+                deadline: deadline,
+                amountIn: amountIn,
+                amountOutMinimum: amountOutMin
+            });
+
+        // 执行交换
+        uint256 amountOut = swapRouter.exactInput(params);
+        emit SwapTokensForTokens(amountIn, amountOut, to);
+        return amountOut;
+    }
+
+    /**
+     * @dev 实现IDexRouter.getAmountsOut
+     * 返回给定输入数量的最优输出数量、路径
+     */
+    function getAmountsOut(
+        address tokenIn, 
+        uint256 amountIn, 
+        address tokenOut, 
+        uint8 maxHops
+    ) external view override returns (Model.SwapPath memory swapPath) {
+        swapPath.inputAmount = amountIn;
+        swapPath.dexRouter = address(this);
+        // 所有路径组合
+        uint256 totalCombinations = _calculateTotalCombinations(exchangeableTokens.length - 1);
+        address[][] memory pathRecord = new address[][](totalCombinations);
+
+        uint256 resultIndex = 0;
+        address[] memory directExchange = new address[](2);
+        directExchange[0] = tokenIn;
+        directExchange[1] = tokenOut;
+        pathRecord[resultIndex++] = directExchange;
+        
+
+        for (uint256 length = 2; length <= maxHops; length++) {
+            if (exchangeableTokens.length < length - 1) continue; // 没有足够的元素
+            
+            uint256[] memory used = new uint256[](exchangeableTokens.length);
+            address[] memory combination = new address[](length + 1);
+            combination[0] = tokenIn;
+            
+            resultIndex = _generatePermutations(
+                tokenIn,
+                combination, 
+                1,
+                used, 
+                pathRecord, 
+                resultIndex,
+                tokenOut,
+                swapPath
+            );
+        }
+        return swapPath;
+    }
+
+    // 查询币对价格
+    function getAmountOutSingle(
+        address tokenIn, 
+        address tokenOut, 
+        uint24 fee, 
+        uint256 amountIn,
+        uint160 sqrtPriceLimitX96
+    ) public view returns (uint256 amount){
+        try quoter.quoteExactInputSingle(tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96) returns (uint256 amountOut) {
+                return amountOut;
+            } catch {
+                // 如果查询失败，返回零
+                return 0;
+            }
+    }
+
+    // 查询多币对价格
+    function getAmountOutMulti(
+        bytes memory path, 
+        uint256 amountIn
+    ) public view returns (uint256 amount){
+        try quoter.quoteExactInput(path, amountIn) returns (uint256 amountOut) {
+                return amountOut;
+            } catch {
+                // 如果查询失败，返回零
+                return 0;
+            }
+    }
+
+    // 计算组合总数
+    function _calculateTotalCombinations(uint256 n) private pure returns (uint256) {
+        if (n == 0) return 1; // 只有长度为1的组合
+        
+        uint256 total = 1; // 长度为1
+        uint256 currentPermutation = 1; 
+    
+        for (uint256 k = 1; k <= n; k++) {
+            currentPermutation *= (n - (k - 1));
+            total += currentPermutation;
+        }
+        
+        return total;
+    }
+
+    // 递归生成排列
+    function _generatePermutations(
+        address tokenIn,
+        address[] memory combination,
+        uint256 depth,
+        uint256[] memory used,
+        address[][] memory pathRecord,
+        uint256 resultIndex,
+        address tokenOut,
+        Model.SwapPath memory swapPath
+    ) private view returns (uint256) {
+        // 达到目标长度，保存组合
+        if (depth == combination.length - 1) {
+            combination[depth] = tokenOut;
+            pathRecord[resultIndex] = new address[](combination.length * 24);
+            bytes memory path = new bytes(0);
+            for (uint256 i = 0; i < combination.length; i++) {
+                pathRecord[resultIndex][i] = combination[i];
+                if (i > 0) {
+                    uint24 fee = feeTiers[combination[i - 1]][combination[i]];
+                    path = bytes.concat(path, abi.encodePacked(combination[i - 1], fee, combination[i]));
+                }
+            }
+            uint256 amountOut  = getAmountOutMulti(path, swapPath.inputAmount);
+            if (amountOut > swapPath.outputAmount) {
+                swapPath.outputAmount = amountOut;
+                swapPath.path = pathRecord[resultIndex];
+                swapPath.pathBytes = path;
+            }
+
+            return resultIndex + 1;
+        }
+        
+        // 遍历所有元素
+        for (uint256 i = 0; i < exchangeableTokens.length; i++) {
+            // 跳过tokenIn和已使用的元素
+            if (exchangeableTokens[i] == tokenIn || used[i] > 0) continue;
+            
+            // 标记为已使用
+            used[i] = 1;
+            
+            // 添加到组合
+            combination[depth] = exchangeableTokens[i];
+            
+            // 递归生成下一层
+            resultIndex = _generatePermutations(
+                tokenIn,
+                combination, 
+                depth + 1,
+                used, 
+                pathRecord,
+                resultIndex,
+                tokenOut,
+                swapPath
+            );
+            
+            // 回溯
+            used[i] = 0;
+        }
+        
+        return resultIndex;
+    }
+
+
+    /**
+     * @dev 实现IDexRouter.dexName
+     * 返回DEX的名称
+     */
+    function dexName() external pure override returns (string memory) {
+        return "UniswapV3";
+    }
+
+}
