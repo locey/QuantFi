@@ -12,8 +12,8 @@ contract UniswapV3AdapterDeploy is Script {
     string private constant DEPLOYMENT_FILE = "deployment.json";
 
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address owner = vm.envAddress("OWNER_ADDRESS");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_1");
+        address owner = vm.envAddress("PRIVATE_KEY_2");
         address positionManager = vm.envAddress("POSITION_MANAGER");
 
         vm.startBroadcast(deployerPrivateKey);

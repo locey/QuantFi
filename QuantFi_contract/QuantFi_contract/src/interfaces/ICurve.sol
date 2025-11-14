@@ -7,9 +7,8 @@ pragma solidity ^0.8.21;
  * 支持多种代币之间的低滑点交换、流动性提供和移除等功能
  */
 interface ICurve {
-    
     // ===== 事件定义 =====
-    
+
     /**
      * @dev 代币交换事件
      * @param buyer 买家地址
@@ -97,7 +96,11 @@ interface ICurve {
     /**
      * @dev 提交新费用事件
      */
-    event CommitNewFee(uint256 indexed deadline, uint256 fee, uint256 admin_fee);
+    event CommitNewFee(
+        uint256 indexed deadline,
+        uint256 fee,
+        uint256 admin_fee
+    );
 
     /**
      * @dev 新费用事件
@@ -107,7 +110,12 @@ interface ICurve {
     /**
      * @dev A参数变化事件
      */
-    event RampA(uint256 old_A, uint256 new_A, uint256 initial_time, uint256 future_time);
+    event RampA(
+        uint256 old_A,
+        uint256 new_A,
+        uint256 initial_time,
+        uint256 future_time
+    );
 
     /**
      * @dev 停止A参数变化事件
@@ -115,7 +123,7 @@ interface ICurve {
     event StopRampA(uint256 A, uint256 t);
 
     // ===== 核心交换功能 =====
-    
+
     /**
      * @dev 获取 A 参数（放大系数）
      * @return A参数值
@@ -134,14 +142,20 @@ interface ICurve {
      * @param deposit 是否为存入操作
      * @return 计算得到的LP代币数量
      */
-    function calc_token_amount(uint256[3] calldata amounts, bool deposit) external view returns (uint256);
+    function calc_token_amount(
+        uint256[3] calldata amounts,
+        bool deposit
+    ) external view returns (uint256);
 
     /**
      * @dev 添加流动性
      * @param amounts 各代币数量数组
      * @param min_mint_amount 最小铸造LP代币数量
      */
-    function add_liquidity(uint256[3] calldata amounts, uint256 min_mint_amount) external;
+    function add_liquidity(
+        uint256[3] calldata amounts,
+        uint256 min_mint_amount
+    ) external;
 
     /**
      * @dev 获取交换输出数量（不包含底层资产）
@@ -150,7 +164,11 @@ interface ICurve {
      * @param dx 输入代币数量
      * @return 输出代币数量
      */
-    function get_dy(int128 i, int128 j, uint256 dx) external view returns (uint256);
+    function get_dy(
+        int128 i,
+        int128 j,
+        uint256 dx
+    ) external view returns (uint256);
 
     /**
      * @dev 获取交换输出数量（包含底层资产）
@@ -159,7 +177,11 @@ interface ICurve {
      * @param dx 输入代币数量
      * @return 输出代币数量
      */
-    function get_dy_underlying(int128 i, int128 j, uint256 dx) external view returns (uint256);
+    function get_dy_underlying(
+        int128 i,
+        int128 j,
+        uint256 dx
+    ) external view returns (uint256);
 
     /**
      * @dev 执行代币交换
@@ -171,20 +193,26 @@ interface ICurve {
     function exchange(int128 i, int128 j, uint256 dx, uint256 min_dy) external;
 
     // ===== 流动性管理 =====
-    
+
     /**
      * @dev 移除流动性
      * @param _amount LP代币数量
      * @param min_amounts 各代币最小获得数量
      */
-    function remove_liquidity(uint256 _amount, uint256[3] calldata min_amounts) external;
+    function remove_liquidity(
+        uint256 _amount,
+        uint256[3] calldata min_amounts
+    ) external;
 
     /**
      * @dev 不平衡移除流动性
      * @param amounts 各代币期望获得数量
      * @param max_burn_amount 最大燃烧LP代币数量
      */
-    function remove_liquidity_imbalance(uint256[3] calldata amounts, uint256 max_burn_amount) external;
+    function remove_liquidity_imbalance(
+        uint256[3] calldata amounts,
+        uint256 max_burn_amount
+    ) external;
 
     /**
      * @dev 计算移除单一代币的数量
@@ -192,7 +220,10 @@ interface ICurve {
      * @param i 代币索引
      * @return 可获得的代币数量
      */
-    function calc_withdraw_one_coin(uint256 _token_amount, int128 i) external view returns (uint256);
+    function calc_withdraw_one_coin(
+        uint256 _token_amount,
+        int128 i
+    ) external view returns (uint256);
 
     /**
      * @dev 移除单一代币流动性
@@ -200,10 +231,14 @@ interface ICurve {
      * @param i 代币索引
      * @param min_amount 最小获得代币数量
      */
-    function remove_liquidity_one_coin(uint256 _token_amount, int128 i, uint256 min_amount) external;
+    function remove_liquidity_one_coin(
+        uint256 _token_amount,
+        int128 i,
+        uint256 min_amount
+    ) external;
 
     // ===== 管理功能 =====
-    
+
     /**
      * @dev 开始A参数变化
      * @param _future_A 目标A参数
@@ -277,7 +312,7 @@ interface ICurve {
     function unkill_me() external;
 
     // ===== 状态查询 =====
-    
+
     /**
      * @dev 获取代币地址
      * @param arg0 代币索引

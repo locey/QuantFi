@@ -191,7 +191,7 @@ contract CompoundAdapter is
             icTokenAmounts
         );
         //适配器合约授权ICToken给compound合约
-        IERC20(compound).approve(compound, params.amounts[0]);
+        IERC20(compound).approve(compound, icTokenAmounts);
         //获取取款之后的适配器合约对应的代币数量
         uint256 tokenAmountsBeforeWithdraw = IERC20(params.tokens[0]).balanceOf(
             address(this)
