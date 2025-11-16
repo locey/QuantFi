@@ -105,11 +105,7 @@ contract UniswapV3Router is IDexRouter, Ownable, ReentrancyGuard {
         
         // 批准路由器使用代币
         IERC20(tokenIn).approve(address(swapRouter), amountIn);
-        
-
-        // 准备交换参数
-        // Model.SwapPath memory swapPath = getAmountsOut(tokenIn, amountIn, tokenOut, maxHops);
-
+        // 设置交换参数
         ISwapRouter.ExactInputParams memory params =
             ISwapRouter.ExactInputParams({
                 path: swapPath.pathBytes,
@@ -120,9 +116,7 @@ contract UniswapV3Router is IDexRouter, Ownable, ReentrancyGuard {
             });
 
         // 执行交换
-        uint256 amountOut = 0;
-        amountOut = swapRouter.exactInput(params);
-        
+        uint256 amountOut = swapRouter.exactInput(params);
         emit SwapTokensForTokens(amountIn, amountOut, to);
         return amountOut;
     }

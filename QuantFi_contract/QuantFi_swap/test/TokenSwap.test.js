@@ -26,7 +26,6 @@ describe("UniswapV3Router test", function () {
 
     const PathFinder = await ethers.getContractFactory("PathFinder");
     const usdtAddress = await tokens.USDT.getAddress();
-    console.log("USDT Address:", usdtAddress);
     pathFinder = await PathFinder.deploy(usdtAddress, maxHops, deployer.address);
     await pathFinder.waitForDeployment();
     const pathFinderAddress = await pathFinder.getAddress();
