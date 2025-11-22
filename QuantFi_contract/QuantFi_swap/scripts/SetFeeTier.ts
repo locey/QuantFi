@@ -4,7 +4,7 @@ import { network } from "hardhat";
 const { ethers } = await network.connect();
 
 
-const uniswapV3RouterAddress = "0x76bD5C52EE789FB1f23068A787C04a826d5214Ed";
+const uniswapV3RouterAddress = "0x4917E5BA809F8eA2D02a16707b5b68284285DC6d";
 
 
 const tokenAddrOnSepolia = {
@@ -32,7 +32,7 @@ async function main() {
   const tx4 = await uniswapV3Router.setFeeTier(tokenAddrOnSepolia.WETH9, tokenAddrOnSepolia.LINK, 3000);
   const res4 = await tx4.wait();
   console.log("Set fee tier tx4 mined:", res4);
-  const tx5 = await uniswapV3Router.setFeeTier(tokenAddrOnSepolia.WETH9, tokenAddrOnSepolia.AAVE, 10000);
+  const tx5 = await uniswapV3Router.setFeeTier(tokenAddrOnSepolia.WETH9, tokenAddrOnSepolia.AAVE, 3000);
   const res5 = await tx5.wait();
   console.log("Set fee tier tx5 mined:", res5);
   const tx6 = await uniswapV3Router.setFeeTier(tokenAddrOnSepolia.WETH9, tokenAddrOnSepolia.UNI, 3000);

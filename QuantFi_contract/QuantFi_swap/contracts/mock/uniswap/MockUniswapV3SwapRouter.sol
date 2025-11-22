@@ -94,7 +94,7 @@ contract MockUniswapV3SwapRouter is ISwapRouter {
         require(params.deadline >= block.timestamp, "Transaction too old");
         
         // 解析路径
-        (address[] memory path, uint24[] memory fees) = decodePath(params.path);
+        (address[] memory path, ) = decodePath(params.path);
         
         // 转移输入代币
         address tokenIn = path[0];
@@ -160,7 +160,7 @@ contract MockUniswapV3SwapRouter is ISwapRouter {
         require(params.deadline >= block.timestamp, "Transaction too old");
         
         // 解析路径
-        (address[] memory path, uint24[] memory fees) = decodePath(params.path);
+        (address[] memory path, ) = decodePath(params.path);
         
         // 反向计算输入金额
         uint256 tempAmount = params.amountOut;

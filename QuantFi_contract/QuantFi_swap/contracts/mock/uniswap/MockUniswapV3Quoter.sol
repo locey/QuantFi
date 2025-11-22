@@ -76,7 +76,7 @@ contract MockUniswapV3Quoter is IQuoterV2 {
         uint256 gasEstimate
     ) {
         // 解析路径字节数组
-        (address[] memory tokenPath, uint24[] memory fees) = decodePath(path);
+        (address[] memory tokenPath, ) = decodePath(path);
         // 计算输出金额
         amountOut = getAmountOut(amountIn, tokenPath);
         
@@ -113,7 +113,7 @@ contract MockUniswapV3Quoter is IQuoterV2 {
         uint256 gasEstimate
     ) {
         // 解析路径字节数组
-        (address[] memory tokenPath, uint24[] memory fees) = decodePath(path);
+        (address[] memory tokenPath,) = decodePath(path);
         
         // 反向计算输入金额
         amountIn = amountOut;

@@ -16,9 +16,9 @@ const tokenAddrOnSepolia = {
 }
 
 const contractAddressOnSepolia = {
-  PathFinder: "0xdB009e240a1EE58146e676D52D91b3B25dcd2d73",
-  TokenSwap: "0xacfBE9b1049fa337a718c2581F1dFC147F22da6d",
-  UniswapV3Router: "0x76bD5C52EE789FB1f23068A787C04a826d5214Ed",
+  PathFinder: "0xd50Ba962E7d2B043797566a3d91Ff6B44Cb68c6E",
+  TokenSwap: "0x70314b0E68f13DCB1D427F74Fecc41A88dDE9E52",
+  UniswapV3Router: "0x4917E5BA809F8eA2D02a16707b5b68284285DC6d",
 }
 
 const uniswapV3SwapRouterAddress = "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E";
@@ -35,7 +35,7 @@ describe("UniswapV3Router sepolia test", function () {
 
     const amountIn = ethers.parseUnits("1.0", 18); // 1 ETH
     // const result = await uniswapV3Router.findOptimalPath.staticCall(zeroAddress, amountIn, tokenAddrOnSepolia.USDT, 4);
-    const result = await PathFinder.findOptimalPath.staticCall(zeroAddress, amountIn);
+    const result = await PathFinder.findOptimalPath.staticCall(tokenAddrOnSepolia.WETH9, amountIn);
     console.log("最优路径结果:", result);
 
     const USDTToken = await ethers.getContractAt("MockERC20", tokenAddrOnSepolia.USDT);
@@ -57,13 +57,14 @@ describe("UniswapV3Router sepolia test", function () {
     expect(result[2]).to.be.eq(quoterRes[0]);
   })
 
-  it("IDexRouter swapTokensForTokens", async function () {
+  it("IDexRouter swapTokensForTokens UNI->USDT", async function () {
+    const signers = await ethers.getSigners();
+    const account = signers[0];
+
+    const uniAmountIn = ethers.parseUnits("0.0001", 18);
+    // 获取路径 (tokenIn + fee + tokenOut)
     const tokenSwap = await ethers.getContractAt("TokenSwap", contractAddressOnSepolia.TokenSwap);
-    const amountIn = ethers.parseUnits("0.000002", 18); // 1 ETH
-    const swapInfo = await tokenSwap.getSwapToTargetQuote.staticCall(zeroAddress, amountIn);
-    console.log("swapInfo:", swapInfo);
-
-
+    const swapInfo = await tokenSwap.getSwapToTargetQuote.staticCall(tokenAddrOnSepolia.UNI, uniAmountIn);
     // swapInfo 返回的是一个数组，需要转换为对象
     const swapInfoObj = {
       path: [...swapInfo[0]],
@@ -72,44 +73,110 @@ describe("UniswapV3Router sepolia test", function () {
       inputAmount: swapInfo[3],
       dexRouter: swapInfo[4],
     };
-
-    console.log("=======================swapInfoObj:", swapInfoObj);
-
-    const signers = await ethers.getSigners();
-    const dexRouter = await ethers.getContractAt("IDexRouter", swapInfoObj.dexRouter);
-    const tx = await dexRouter.swapTokensForTokens(
-      swapInfoObj,
-      zeroAddress,
-      amountIn,
-      0, 
-      signers[0].address,
-      Math.floor(Date.now() / 1000) + 6000,
-      {
-        value: amountIn, 
-        gasLimit: 300000, // 设置合适的 gas limit
-        gasPrice: ethers.parseUnits("10", "gwei")
-      });
-    const result = await tx.wait();
-    console.log("swapTokensForTokens 交易完成:", result);
-  })
-
-  it("UniswapV3SwapRouter", async function () {
-    const amountIn = ethers.parseUnits("0.000002", 18); // 1 ETH
-    const signers = await ethers.getSigners();
+     // 设置交易参数
     let params = {
-      path: '0xfff9976782d46cc05630d1f6ebab18b2324d6b1400271088541670e55cc00beefd87eb59edd1b7c511ac9a000bb8f8fb3713d459d7c1018bd0a49d19b4c44290ebe5000bb81f9840a85d5af5bf1d1762f925bdaddc4201f984000bb8aa8e23fb1079ea71e0a56f48a2aa51851d8433d0',
-      recipient: signers[0].address,
-      deadline: Math.floor(Date.now() / 1000) + 6000,
-      amountIn: amountIn,
-      amountOutMinimum: 0
+      path: swapInfoObj,
+      tokenIn: tokenAddrOnSepolia.UNI,
+      amountIn: swapInfo.inputAmount, // 0.01 UNI
+      amountOutMin: 0, // 最小输出数量（这里设置为0，实际使用时应该设置合理的最小值）
+      to: await account.getAddress(),
+      deadline: Math.floor(Date.now() / 1000) + 60 * 10 // 10分钟后过期
     }
-    const MockUniswapV3SwapRouter = await ethers.getContractAt("MockUniswapV3SwapRouter", uniswapV3SwapRouterAddress);
-    const tx = await MockUniswapV3SwapRouter.exactInput(params, 
+    console.log("交易参数:", params);
+
+    // 检查余额和授权
+    const uniToken = await ethers.getContractAt("MockERC20", tokenAddrOnSepolia.UNI);
+    const uniBalance = await uniToken.balanceOf(params.to)
+    console.log(`UNI余额:`, ethers.formatUnits(uniBalance, 18));
+    const allowance = await uniToken.allowance(params.to, swapInfoObj.dexRouter,);
+    // 获取交易前的USDT余额
+    const usdtToken = await ethers.getContractAt("MockERC20", tokenAddrOnSepolia.USDT);
+    const usdtBalanceBefore = await usdtToken.balanceOf(params.to);
+    console.log(`交易前USDT余额:`, ethers.formatUnits(usdtBalanceBefore, 6));
+    // 检查授权
+    if (allowance < uniAmountIn) {
+      console.log("需要授权...");
+      const approveTx = await uniToken.approve(swapInfoObj.dexRouter, uniAmountIn);
+      await approveTx.wait();
+      console.log("授权完成");
+    }
+   
+    console.log("执行兑换...");
+        // 调用 exactInput 方法
+    const dexRouter = await ethers.getContractAt("IDexRouter", swapInfoObj.dexRouter);
+    const tx = await dexRouter.swapTokensForTokens(...Object.values(params),
       {
-        gasLimit: 300000, // 设置合适的 gas limit
-        gasPrice: ethers.parseUnits("10", "gwei")
-      });
-    const res = await tx.wait();
-    console.log("PathFinder dexRouters uniswapV3:", res);
-  });
+        gasLimit: 3000000, // 设置合适的 gas limit
+        gasPrice: ethers.parseUnits("20", "gwei")
+      }
+    );
+    await tx.wait();
+    console.log("交易已发送，等待确认...");
+    console.log("交易成功！");
+    console.log("交易哈希:", tx.hash);
+
+    // 获取交易后的余额
+    const uniBalanceAfter = await uniToken.balanceOf(params.to);
+    const usdtBalanceAfter = await usdtToken.balanceOf(params.to);
+    console.log(`交易后UNI余额:`, ethers.formatUnits(uniBalanceAfter, 18));
+    console.log(`交易后USDT余额:`, ethers.formatUnits(usdtBalanceAfter, 6));
+    console.log(`UNI支出:`, ethers.formatUnits(params.amountIn, 18));
+    console.log(`USDT获得:`, ethers.formatUnits(usdtBalanceAfter - usdtBalanceBefore, 6));
+    expect(usdtBalanceAfter).to.be.gt(usdtBalanceBefore);
+  })
+ 
+  it("IDexRouter swapTokensForTokens ETH->USDT", async function () {
+    const signers = await ethers.getSigners();
+    const account = signers[0];
+
+    const ethAmountIn = ethers.parseUnits("0.01", 18);
+    // 获取路径 (tokenIn + fee + tokenOut)
+    const tokenSwap = await ethers.getContractAt("TokenSwap", contractAddressOnSepolia.TokenSwap);
+    const swapInfo = await tokenSwap.getSwapToTargetQuote.staticCall(zeroAddress, ethAmountIn);
+    // swapInfo 返回的是一个数组，需要转换为对象
+    const swapInfoObj = {
+      path: [...swapInfo[0]],
+      pathBytes: swapInfo[1],
+      outputAmount: swapInfo[2],
+      inputAmount: swapInfo[3],
+      dexRouter: swapInfo[4],
+    };
+     // 设置交易参数
+    let params = {
+      path: swapInfoObj,
+      tokenIn: tokenAddrOnSepolia.WETH9,
+      amountIn: swapInfo.inputAmount, // 0.01 UNI
+      amountOutMin: 0, // 最小输出数量（这里设置为0，实际使用时应该设置合理的最小值）
+      to: await account.getAddress(),
+      deadline: Math.floor(Date.now() / 1000) + 60 * 10 // 10分钟后过期
+    }
+    console.log("交易参数:", params);
+
+    // 获取交易前的USDT余额
+    const usdtToken = await ethers.getContractAt("MockERC20", tokenAddrOnSepolia.USDT);
+    const usdtBalanceBefore = await usdtToken.balanceOf(params.to);
+    console.log(`交易前USDT余额:`, ethers.formatUnits(usdtBalanceBefore, 6));
+   
+    console.log("执行兑换...");
+        // 调用 exactInput 方法
+    const dexRouter = await ethers.getContractAt("IDexRouter", swapInfoObj.dexRouter);
+    const tx = await dexRouter.swapTokensForTokens(...Object.values(params),
+      {
+        value: params.amountIn,
+        gasLimit: 3000000, // 设置合适的 gas limit
+        gasPrice: ethers.parseUnits("20", "gwei")
+      }
+    );
+    await tx.wait();
+    console.log("交易已发送，等待确认...");
+    console.log("交易成功！");
+    console.log("交易哈希:", tx.hash);
+
+    // 获取交易后的余额
+    const usdtBalanceAfter = await usdtToken.balanceOf(params.to);
+    console.log(`交易后USDT余额:`, ethers.formatUnits(usdtBalanceAfter, 6));
+    console.log(`eth支出:`, ethers.formatUnits(params.amountIn, 18));
+    console.log(`USDT获得:`, ethers.formatUnits(usdtBalanceAfter - usdtBalanceBefore, 6));
+    expect(usdtBalanceAfter).to.be.gt(usdtBalanceBefore);
+  })
 });

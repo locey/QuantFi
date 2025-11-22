@@ -3,7 +3,8 @@ pragma solidity ^0.8.20;
 
 import "../../IDexRouter.sol";
 import "../../lib/Model.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "./interface/ISwapRouter02.sol";
+import "@uniswap/swap-router-contracts/contracts/interfaces/IV3SwapRouter.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/IQuoterV2.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -21,7 +22,7 @@ interface WETH9Token {
  */
 contract UniswapV3Router is IDexRouter, Ownable, ReentrancyGuard {
     // Uniswap V3路由器地址
-    ISwapRouter public immutable swapRouter;
+    ISwapRouter02 public immutable swapRouter;
 
     // Uniswap V3 Quoter地址
     IQuoterV2 public immutable quoter;
@@ -58,7 +59,7 @@ contract UniswapV3Router is IDexRouter, Ownable, ReentrancyGuard {
         require(_factory != address(0), "UniswapV3Router: INVALID_FACTORY");
         require(_owner != address(0), "UniswapV3Router: INVALID_OWNER");
         quoter = IQuoterV2(_quoter);
-        swapRouter = ISwapRouter(_swapRouter);
+        swapRouter = ISwapRouter02(_swapRouter);
         factory = IUniswapV3Factory(_factory);
         WETH9 = WETH9Token(_WETH9);
         exchangeableTokens = _exchangeableTokens;
@@ -151,11 +152,10 @@ contract UniswapV3Router is IDexRouter, Ownable, ReentrancyGuard {
         // 批准路由器使用代币
         IERC20(tokenIn).approve(address(swapRouter), amountIn);
         // 设置交换参数
-        ISwapRouter.ExactInputParams memory params = ISwapRouter
+        IV3SwapRouter.ExactInputParams memory params = IV3SwapRouter
             .ExactInputParams({
                 path: swapPath.pathBytes,
                 recipient: to,
-                deadline: deadline,
                 amountIn: amountIn,
                 amountOutMinimum: amountOutMin
             });
