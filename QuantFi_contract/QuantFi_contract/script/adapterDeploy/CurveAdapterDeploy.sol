@@ -13,18 +13,21 @@ contract CurveAdapterDeploy is Script {
         "script/deployInfo/curve-adapter-deployment.json";
     string private constant THIRD_PARTY_DEPLOYMENT_FILE =
         "script/deployInfo/all-mock-third-party-deployment.json";
-    string private constant ABI_FILE = 
-        "out/adapters/CurveAdapter.sol/CurveAdapter.json";
 
     function run() external {
         bytes32 deployerPrivateKey = vm.envBytes32("PRIVATE_KEY_1");
         bytes32 ownerPrivateKey = vm.envBytes32("PRIVATE_KEY_2");
         address owner = vm.addr(uint256(ownerPrivateKey));
-        
+
         // 从部署文件中读取 Curve 地址
-        string memory thirdPartyDeploymentData = vm.readFile(THIRD_PARTY_DEPLOYMENT_FILE);
-        address curveAddress = stdJson.readAddress(thirdPartyDeploymentData, ".mockCurve");
-        
+        string memory thirdPartyDeploymentData = vm.readFile(
+            THIRD_PARTY_DEPLOYMENT_FILE
+        );
+        address curveAddress = stdJson.readAddress(
+            thirdPartyDeploymentData,
+            ".mockCurve"
+        );
+
         vm.startBroadcast(uint256(deployerPrivateKey));
 
         // 部署实现合约
@@ -59,9 +62,6 @@ contract CurveAdapterDeploy is Script {
             curveAddress,
             owner
         );
-        
-        // 生成ABI文件
-        _generateAbiFile(address(implementation));
     }
 
     function _writeDeploymentInfo(
@@ -72,33 +72,67 @@ contract CurveAdapterDeploy is Script {
     ) internal {
         // 手动构建格式化的JSON字符串
         string memory formattedJson = "{\n";
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"network\": \"", vm.toString(block.chainid), "\",\n"));
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"chainId\": ", vm.toString(block.chainid), ",\n"));
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"implementation\": \"", vm.toString(implementation), "\",\n"));
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"proxy\": \"", vm.toString(proxy), "\",\n"));
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"curveAddress\": \"", vm.toString(curveAddress), "\",\n"));
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"owner\": \"", vm.toString(owner), "\",\n"));
-        formattedJson = string(abi.encodePacked(formattedJson, "  \"deployedAt\": ", vm.toString(block.timestamp), "\n"));
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "network": "',
+                vm.toString(block.chainid),
+                '",\n'
+            )
+        );
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "chainId": ',
+                vm.toString(block.chainid),
+                ",\n"
+            )
+        );
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "implementation": "',
+                vm.toString(implementation),
+                '",\n'
+            )
+        );
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "proxy": "',
+                vm.toString(proxy),
+                '",\n'
+            )
+        );
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "curveAddress": "',
+                vm.toString(curveAddress),
+                '",\n'
+            )
+        );
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "owner": "',
+                vm.toString(owner),
+                '",\n'
+            )
+        );
+        formattedJson = string(
+            abi.encodePacked(
+                formattedJson,
+                '  "deployedAt": ',
+                vm.toString(block.timestamp),
+                "\n"
+            )
+        );
         formattedJson = string(abi.encodePacked(formattedJson, "}\n"));
 
         // 写入文件
         vm.writeFile(DEPLOYMENT_FILE, formattedJson);
 
         console.log("Deployment info written to:", DEPLOYMENT_FILE);
-    }
-    
-    function _generateAbiFile(address implementation) internal {
-        // 读取ABI文件内容
-        string memory abiContent = vm.readFile(ABI_FILE);
-        
-        // 提取ABI部分
-        string memory abiJson = stdJson.parse(abiContent, ".abi").serialize("abi", abiContent);
-        string memory finalAbi = stdJson.serialize(abiJson, "abi", stdJson.parse(abiContent, ".abi"));
-        
-        // 写入ABI到部署信息目录
-        string memory abiOutputPath = "script/deployInfo/curve-adapter.abi.json";
-        vm.writeJson(finalAbi, abiOutputPath);
-        
-        console.log("ABI written to:", abiOutputPath);
     }
 }
