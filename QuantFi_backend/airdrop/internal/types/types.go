@@ -18,7 +18,7 @@ type ClaimProofData struct {
 }
 
 type ClaimProofRequest struct {
-	RoundId int64 `json:"roundId"`
+	RoundId int64 `form:"roundId"`
 }
 
 type ClaimProofResponse struct {
@@ -67,8 +67,7 @@ type RoundInfoData struct {
 }
 
 type RoundInfoRequest struct {
-	RoundId   uint64 `json:"currentRoundId"`
-	RoundName string `json:"roundName"`
+	RoundId uint64 `form:"roundId"`
 }
 
 type RoundInfoResponse struct {

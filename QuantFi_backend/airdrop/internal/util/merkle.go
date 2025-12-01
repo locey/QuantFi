@@ -23,8 +23,11 @@ func LeafHash(roundID uint64, wallet string, amount *big.Int) []byte {
 	walletAddr := common.HexToAddress(wallet)
 
 	// Encode: roundId (uint256) + wallet (address) + amount (uint256)
-	// In Solidity: abi.encodePacked(roundId, msg.sender, amount)
-	// abi.encodePacked concatenates without padding, but for uint256 we need 32 bytes
+	// In Solidity: keccak256(abi.encodePacked(roundId, msg.sender, amount))
+	// - roundId: uint256 -> 32 bytes, big-endian
+	// - wallet: address  -> 20 bytes
+	// - amount: uint256  -> 32 bytes, big-endian
+	// Total: 84 bytes
 	data := make([]byte, 0, 32+20+32)
 
 	// roundId as uint256 (32 bytes, big-endian)
@@ -36,8 +39,9 @@ func LeafHash(roundID uint64, wallet string, amount *big.Int) []byte {
 	data = append(data, walletAddr.Bytes()...)
 
 	// amount as uint256 (32 bytes, big-endian)
-	amountBytes := make([]byte, 32)
-	binary.BigEndian.PutUint64(amountBytes[24:], amount.Uint64())
+	// IMPORTANT: must use the full 256-bit value, not truncate to uint64,
+	// otherwise it will not match Solidity's uint256 encoding.
+	amountBytes := amount.FillBytes(make([]byte, 32))
 	data = append(data, amountBytes...)
 
 	hash := crypto.Keccak256(data)

@@ -31,8 +31,7 @@ type StartRoundRequest {
 }
 
 type RoundInfoRequest {
-	roundId   uint64 `json:"currentRoundId"`
-	roundName string `json:"roundName"`
+	roundId   uint64 `form:"roundId"`
 }
 
 type RoundInfoData {
@@ -79,7 +78,7 @@ type SubmitTaskResponse {
 }
 
 type ClaimProofRequest {
-	roundId int64 `json:"roundId"`
+	roundId int64 `json:"roundId" form:"roundId"`
 }
 
 type ClaimProofData {

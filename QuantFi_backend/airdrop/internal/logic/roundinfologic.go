@@ -10,8 +10,6 @@ import (
 	"airdrop/internal/svc"
 	"airdrop/internal/types"
 
-	"errors"
-
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
 )
@@ -31,32 +29,16 @@ func NewRoundInfoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *RoundIn
 }
 
 func (l *RoundInfoLogic) RoundInfo(req *types.RoundInfoRequest) (*types.RoundInfoResponse, error) {
-	if req.RoundId == 0 && req.RoundName == "" {
-		return nil, errors.New("roundId and roundName cannot be empty")
-	}
 	var round entity.AirdropRound
-	if req.RoundId != 0 {
-		err := l.svcCtx.DB.WithContext(l.ctx).Where("id = ?", req.RoundId).First(&round).Error
-		if err == gorm.ErrRecordNotFound {
-			return &types.RoundInfoResponse{
-				BaseResp: types.BaseResp{
-					Code: 0,
-					Msg:  "success",
-				},
-				Data: types.RoundInfoData{},
-			}, nil
-		}
-	} else {
-		err := l.svcCtx.DB.WithContext(l.ctx).Where("name like ?", "%"+req.RoundName+"%").Order("id DESC").First(&round).Error
-		if err == gorm.ErrRecordNotFound {
-			return &types.RoundInfoResponse{
-				BaseResp: types.BaseResp{
-					Code: 0,
-					Msg:  "success",
-				},
-				Data: types.RoundInfoData{},
-			}, nil
-		}
+	err := l.svcCtx.DB.WithContext(l.ctx).Where("id = ?", req.RoundId).First(&round).Error
+	if err == gorm.ErrRecordNotFound {
+		return &types.RoundInfoResponse{
+			BaseResp: types.BaseResp{
+				Code: 0,
+				Msg:  "success",
+			},
+			Data: types.RoundInfoData{},
+		}, nil
 	}
 	var total int64
 	l.svcCtx.DB.WithContext(l.ctx).Model(&entity.RoundPoint{}).Where("round_id = ?", round.ID).Select("COALESCE(SUM(points),0)").Scan(&total)

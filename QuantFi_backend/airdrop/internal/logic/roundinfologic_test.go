@@ -38,7 +38,7 @@ func TestRoundInfoLogic(t *testing.T) {
 		t.Fatalf("create round point: %v", err)
 	}
 	req := &types.RoundInfoRequest{
-		RoundName: round.Name,
+		RoundId: round.ID,
 	}
 	resp, err := NewRoundInfoLogic(context.Background(), svcCtx).RoundInfo(req)
 	if err != nil {

@@ -26,27 +26,14 @@ Content-Type: application/json
 GET {{baseUrl}}/api/airdrop/v1/me/points
 Authorization: Bearer {{$global.accessToken}}
 
-
-
 ###
-### 发起空投领取（需要在后台配置轮次）
-POST {{baseUrl}}/api/airdrop/v1/airdrop/claim
+### 查询当前用户空投领取证明，需要 Bearer Token
+GET {{baseUrl}}/api/airdrop/v1/airdrop/me/proof?roundId=12
 Authorization: Bearer {{$global.accessToken}}
-Content-Type: application/json
-
-{
-  "roundId": {{roundId}},
-  "wallet": "{{wallet}}",
-  "amount": 100,
-  "proof": [
-    "0xProofLeaf00000000000000000000000000000000000000000000000000000000000000",
-    "0xProofBranch000000000000000000000000000000000000000000000000000000000000"
-  ]
-}
 
 ###
-### 查询当前空投轮次（管理员 JWT）
-GET {{baseUrl}}/api/airdrop/v1/admin/airdrop/round
+### 查询当前空投轮次（管理员 JWT） 10
+GET {{baseUrl}}/api/airdrop/v1/admin/airdrop/round?roundId=12
 Authorization: Bearer {{$global.accessToken}}
 
 ###
@@ -56,8 +43,7 @@ Authorization: Bearer {{$global.accessToken}}
 Content-Type: application/json
 
 {
-  "roundName": "Season-1",
-  "merkleRoot": "0xMerkleRoot000000000000000000000000000000000000000000000000000000000000",
-  "tokenAddress": "0xTokenAddress000000000000000000000000000000000000",
-  "claimDeadline": 1730390400
+  "roundName": "season-4",
+  "tokenAddress": "0x4356a7628f97612dd8fac80b1f8354962d12123c",
+  "claimDeadline": 1796047259
 }
